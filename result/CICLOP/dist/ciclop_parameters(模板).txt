@@ -1,0 +1,12 @@
+PDB_File_Name: 1aon.pdb
+FASTA_FILE_NAME: rcsb_pdb_1AON.fasta
+Alignment: 1
+Cons_score: YES
+Rate_inf_method: EB
+Evo_model: JCamino
+E_value: 10
+Blast_method: j
+nr_db: <Enter Path>
+swissprot: <Enter Path>
+psiblast: <Enter Path>
+jackhmmer: <Enter Path>

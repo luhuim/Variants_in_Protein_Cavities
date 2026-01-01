@@ -1,0 +1,9 @@
+cat sample_1.tsv |while read line; do echo $line; done
+
+wget "https://files.rcsb.org/download/$id.pdb"; done
+
+cat sample_1.tsv |while read line; do wget https://files.rcsb.org/download/$id.pdb; done
+
+cat sample_1.tsv |while read line; do wget https://www.rcsb.org/fasta/entry/$line -O $line.fasta; done
+
+scp /mnt/h/Lund_Project/Fourth/CICLOP/dist/Writing_Parameter.py inf-31-2021@bioinf-serv2.cob.lu.se:/home/inf-31-2021/Research_Project/Fourth/CICLOP/dist
