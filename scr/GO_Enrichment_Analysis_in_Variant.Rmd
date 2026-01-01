@@ -1,0 +1,213 @@
+---
+title: "GO Enrichment Analysis"
+author: "Huimin Lu"
+date: "2023/1/8"
+output: html_document
+---
+
+Import packages
+```{r}
+
+#source("https://bioconductor.org/biocLite.R")
+#BiocManager::install("clusterProfiler")  #enrichment analysis
+#.libPaths() 
+#unlink("D:/R-4.1.2/library/00LOCK", recursive = TRUE)
+#BiocManager::install("topGO")
+#BiocManager::install("Rgraphviz")
+#BiocManager::install("pathview") #KEGG pathway
+#BiocManager::install("org.Hs.eg.db") #human's annotation
+
+library(readr)
+library(ggplot2)
+library(clusterProfiler)
+library(topGO)
+library(Rgraphviz)
+library(pathview)
+library(org.Hs.eg.db)
+```
+
+# Comparing cavity with enrire human protein
+Import cavity mapping data and put the data in dataframe.
+```{r}
+#Import data and check
+setwd("H:/Lund_Project/Fifth")
+Cavity_Mapping_table <- read_tsv("Mapping_cavity_uniprot_in_human.tsv",show_col_types = FALSE)
+
+#the column "Gene Name" is symbol ID of each Uniprot ID.
+#But there are couple of symbol IDs each line, only the first ID is official symbol ID
+
+Cavity_Symbol_ids<-as.character(Cavity_Mapping_table$`Gene Names`)#extract the column "Gene_Names" 
+
+Cavity_symbol_id<-vector()#"symbol_id" will contain all official symbol ID
+
+#adding the first id in every line (official symbol ID) into "symbol_id" 
+for (ids in Cavity_Symbol_ids){
+  id_list <- strsplit(ids,"[[:space:]]") 
+  #print(id_list[[1]][1])
+  #print(typeof(id_list))
+  Cavity_symbol_id<-append(Cavity_symbol_id,id_list[[1]][1])
+} 
+
+Cavity_symbol_id<-matrix(Cavity_symbol_id)
+
+#Transform symbol ID into Entrez_ID
+entrez_id <- mapIds(x = org.Hs.eg.db,
+                       keys = Cavity_symbol_id,
+                       keytype = "SYMBOL",
+                       column = "ENTREZID")
+#Cavity_entrez_id
+Cavity_entrez_id <- na.omit(entrez_id)# remove invalid value
+```
+Do Enrichment analysis for cavities.
+```{R}
+#GO Enrichment Analysis for cavity (BP)
+Cavity_erich_go_BP <- enrichGO(gene = Cavity_entrez_id,
+                       OrgDb = org.Hs.eg.db,
+                       keyType = "ENTREZID",
+                       ont = "BP",
+                       pvalueCutoff = 0.05,
+                       qvalueCutoff = 0.05)
+
+##make plot
+#dotplot(Cavity_erich_go_BP,title="BP of cavity")
+Cavity_BP<-data.frame()
+Cavity_BP<-Cavity_erich_go_BP[1:150,]
+print(Cavity_BP[,2])
+
+
+##Enrich Analysis CC
+Cavity_erich_go_CC = enrichGO(gene = Cavity_entrez_id,
+                       OrgDb = org.Hs.eg.db,
+                       keyType = "ENTREZID",
+                       ont = "CC",
+                       pvalueCutoff = 0.05,
+                       qvalueCutoff = 0.05)
+## plot
+#barplot(Cavity_erich.go_CC,title="CC of cavity")
+Cavity_CC<-data.frame()
+Cavity_CC<-Cavity_erich_go_CC[1:100,]
+print(Cavity_CC[,2])
+
+##Enrich Analysis MF
+Cavity_erich_go_MF = enrichGO(gene = Cavity_entrez_id,
+                       OrgDb = org.Hs.eg.db,
+                       keyType = "ENTREZID",
+                       ont = "MF",
+                       pvalueCutoff = 0.05,
+                       qvalueCutoff = 0.05)
+## plot
+#barplot(Cavity_erich_go_MF,title="MF of cavity")
+Cavity_MF<-data.frame()
+#Cavity_MF<-Cavity_erich_go_MF[1:15,]
+Cavity_MF<-Cavity_erich_go_MF[1:150,]
+print(Cavity_MF[,2])
+
+```
+Make a tree for cavity (BP)
+```{r}
+##GO tree
+#plotGOgraph(erich_go_BP)
+#save as PDF
+# pdf(file="./GO_Enrichment_BP_of_Cavity.pdf",width = 10,height = 15)
+# plotGOgraph(erich_go_BP)
+# dev.off()
+```
+
+
+
+
+
+# Comparing variant with cavity
+Import variant mapping data, and put the data in dataframe.
+```{r}
+#Import data and check
+setwd("H:/Lund_Project/Sixth")
+Variant_Mapping_table <- read_tsv("Mapping_variant_uniprot_to_gene_human.tsv ",show_col_types = FALSE)
+
+#the column "Gene Name" is symbol ID of each Uniprot ID.
+#But there are couple of symbol IDs each line, only the first ID is official symbol ID
+Variant_Symbol_ids<-as.character(Variant_Mapping_table$`Gene Names`)#extract the column "Gene_Names"
+
+Variant_symbol_id<-vector()#"symbol_id" will contain all official symbol ID
+
+#adding the first id in every line (official symbol ID) into "symbol_id"
+for (ids in Variant_Symbol_ids){
+  id_list <- strsplit(ids,"[[:space:]]") 
+  #print(id_list[[1]][1])
+  #print(typeof(id_list))
+  Variant_symbol_id<-append(Variant_symbol_id,id_list[[1]][1])
+} 
+
+Variant_symbol_id<-matrix(Variant_symbol_id)
+
+
+
+#Transform symbol ID into Entrez_ID
+Variant_entrez_id <- mapIds(x = org.Hs.eg.db,
+                    keys = Variant_symbol_id,
+                    keytype = "SYMBOL",
+                    column = "ENTREZID")
+#entrez_id
+Variant_entrez_id <- na.omit(Variant_entrez_id)# remove invalid value
+
+
+
+```
+
+```{r}
+
+#regard "Cavity_entrez_id" as background gene
+background_gene<-Cavity_entrez_id
+
+#Enrichment Analysis for variant (BP)
+Variant_erich_go_BP <- enrichGO(gene = Variant_entrez_id,
+                        OrgDb = org.Hs.eg.db,
+                        keyType = "ENTREZID",
+                        ont = "BP",
+                        universe= background_gene,
+                        pvalueCutoff = 0.05,
+                        qvalueCutoff = 0.05)
+##make plot BP
+#dotplot(Variant_erich_go_BP,title="BP of variant on cavity")
+
+Variant_BP<-data.frame()
+Variant_BP<-Variant_erich_go_BP[1:100,]
+print(as.vector(Variant_BP[,2]))
+#Cavity_entrez_id
+
+
+##Enrich Analysis CC
+Variant_erich_go_CC = enrichGO(gene = Variant_entrez_id,
+                       OrgDb = org.Hs.eg.db,
+                       keyType = "ENTREZID",
+                       ont = "CC",
+                       universe= background_gene,
+                       pvalueCutoff = 0.05,
+                       qvalueCutoff = 0.05)
+## plot CC
+#barplot(Variant_erich_go_CC,title="CC of variant on cavity")
+
+Variant_CC<-data.frame()
+Variant_CC<-Variant_erich_go_CC[1:100,]
+print(as.vector(Variant_CC[,2]))
+
+
+###
+##Enrich Analysis MF
+Variant_erich_go_MF = enrichGO(gene = Variant_entrez_id,
+                       OrgDb = org.Hs.eg.db,
+                       keyType = "ENTREZID",
+                       ont = "MF",
+                       universe= background_gene,
+                       pvalueCutoff = 0.05,
+                       qvalueCutoff = 0.05)
+## plot MF
+#barplot(Variant_erich_go_MF,title="MF of variant on cavity")
+
+Variant_MF<-data.frame()
+Variant_MF<-Variant_erich_go_MF[1:100,]
+print(as.vector(Variant_MF[,2]))
+
+```
+
+

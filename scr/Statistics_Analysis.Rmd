@@ -1,0 +1,281 @@
+---
+title: "SK_test"
+author: "Huimin Lu"
+date: "2023/1/2"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+
+library(car)
+library(DescTools)
+library(DHARMa)
+library(ggplot2)
+#library(ggmosaic)
+library(lattice)
+library(lmtest)
+library(MASS)
+library(MuMIn)
+# Check whether the package exist
+any(grepl("readxl",installed.packages()))
+library("readxl")
+#check 
+#install.packages("dgof")
+library("dgof")
+```
+
+```{r}
+setwd("H:/Lund_Project/Sixth")
+```
+
+# Keep data in order
+```{r}
+moth <- read_excel("Variant_Summary.xlsx")
+#extract final row, it is variant.
+variant<-moth[21,]
+
+variant<-variant[,-1]#remove first column
+variant<-variant[,-21]#remove final column
+
+variant<- as.numeric(variant)
+#variant
+```
+
+```{r}
+#extract final column, it is original.
+original<-moth$sum_col
+original<-original[-21]
+#original
+```
+
+```{r}
+library(readr)
+setwd("H:/Lund_Project/Fifth")
+whole<- read_tsv("Amino_Acid_Count.tsv",show_col_types = FALSE)
+cavity<- read_tsv("Cavity_Amino_acid_1.tsv",show_col_types= FALSE) 
+```
+
+```{r}
+sum_all_amino_acid<-c()
+sum_cavity_amino_acid_1<-c()
+# print(length(t(whole[,2])))# the number of rows are the same
+# print(length(whole[[2]]))# the same
+for(Col in seq(2,21)) {
+  #print(all_amino_acid[[Col]])
+  sum_all<-sum(whole[[Col]])  
+  sum_all_amino_acid<-append(sum_all_amino_acid,sum_all)
+  #
+  sum_cavity_1<-sum(cavity[[Col]])  
+  sum_cavity_amino_acid_1<-append(sum_cavity_amino_acid_1,sum_cavity_1)
+}
+#sum_all_amino_acid
+#sum_cavity_amino_acid_1
+
+```
+
+# Chi-Square (Observed vs Normolized red)
+## Normalization and create the dataframe
+```{r}
+#nomalize "sum_cavity_amino_acid_1" into "original"
+
+#Switch index 6 and 7 in "sum_cavity_amino_acid_1"
+
+#print("Before switch")
+#print("Six")
+#sum_cavity_amino_acid_1[6]
+#print("Seven")
+#sum_cavity_amino_acid_1[7]
+
+#Extract
+Six<-sum_cavity_amino_acid_1[6]
+Seven<-sum_cavity_amino_acid_1[7]
+#replace
+sum_cavity_amino_acid_1[6]<-Seven
+sum_cavity_amino_acid_1[7]<-Six
+
+#print("After Switch")
+#sum_cavity_amino_acid_1[6]
+#sum_cavity_amino_acid_1[7]
+
+#Normalization
+sum_of_cavity<-sum(sum_cavity_amino_acid_1)
+sum_of_variant<-sum(original)
+
+#"cavity_normalized" is the amount of cavity that be normalizes into variant amount
+cavity_normalized<-c()
+#calculate the percent 
+for ( n in seq(1,20)){
+  val<-round(sum_cavity_amino_acid_1[n]/sum_of_cavity*sum_of_variant,digits = 0)
+  #append(x, value, index(optional))
+  cavity_normalized<-append(cavity_normalized,val)
+}
+
+sum_of_cavity
+sum_of_variant
+cavity_normalized
+
+```
+
+```{r}
+# "variant_on_cavity" is the amount of variants on cavity
+variant_on_cavity<-original
+data<- data.frame(variant_on_cavity,cavity_normalized)
+data<-t(data)
+colnames(data)<-c("A","R","N","D","C","Q","E","G","H","I","L","K","M","F","P","S","T","W","Y","V")
+data
+```
+
+
+## Doing Chi-Square test
+```{r}
+#chi-square
+#chisq.test(data)
+
+#wilcoxn
+wilcox.test(variant_on_cavity, cavity_normalized, paired=TRUE)# the order is settled
+
+#ks
+#ks.test(variant_on_cavity,cavity_normalized)#the order will mix
+```
+
+```{r}
+
+sum_cavity_amino_acid_1
+```
+
+
+# Hypergeometrics
+```{r}
+options(scipen=0, digits = 7)
+#"hyper" a dataframe:first row is "sum_cavity_amino_acid_1";second row is "variant_on_cavity"
+hyper<- data.frame(sum_cavity_amino_acid_1,variant_on_cavity)
+hyper<-t(hyper)
+single_letter<-c("A","R","N","D","C","Q","E","G","H","I","L","K","M","F","P","S","T","W","Y","V")
+colnames(hyper)<-single_letter
+# hyper
+
+# N: total number of amino acids in cavities, the value is in millions
+# print("N: total number of amino acids in cavities, the value is in millions ")
+N<-sum(sum_cavity_amino_acid_1)#It is not parameter in R programing
+N
+# n: total number of amino acids in variants, n is k in R programing
+# print("n: total number of amino acids in variants,(the number of drawing)")
+k<-sum(variant_on_cavity)
+k
+#
+
+P_value<-c()
+Expected_Value<-c()
+Fold_Change_Value<-c()
+Expect_Text<-c()
+for (i in 1:20){
+  # print(single_letter[i])#this is amino acid letter
+  
+  #K is the number of arginines in cavities, K is m in R programming
+  m<-sum_cavity_amino_acid_1[i]
+  
+  #n is number of failure
+  n<- N-m
+
+#k is is the number of arginines in variants, k is x in R programming
+  x<-variant_on_cavity[i]
+  
+  p <- signif(dhyper(x,m,n,k),digits = 3)#"p" is P-Value of this amino acid letter
+  P_value<-append(P_value,p)#Add "p" into vecter "P_value"
+  # print(p)
+  
+  #Calculate Expected Value
+  expected<-k*m/N
+  Expected_Value<-append(Expected_Value, expected)
+  
+  #compare x with expected
+  if (expected<x){
+    Expect_Text<-append(Expect_Text,"over-enriched")
+    fold_change<-x/expected
+  }else if (expected>x){
+    Expect_Text<-append(Expect_Text,"under-enriched")
+    fold_change<-expected/x  
+  }else{
+    Expect_Text<-append(Expect_Text,"matched")
+    fold_change<-1
+  }
+  #add fold_change
+  Fold_Change_Value<-append(Fold_Change_Value,fold_change)
+}
+
+# P_value
+P_value<-as.list(P_value)
+
+hyper_1<-rbind(hyper,P_value,Expected_Value,Expect_Text,Fold_Change_Value)
+
+hyper_1<-t(hyper_1)
+
+# df ['new'] <- c (3, 3, 6, 7, 8, 12)
+# hyper_1["Expected"]<-Expected_Value
+# hyper_1["Fold_Change"]<-Fold_Change_Value
+```
+```{r}
+data2 <- data.frame(
+  amino_acids ,  
+  variant_on_cavity
+  )
+ggplot(data2, aes(x=amino_acids, y=variant_on_cavity,fill=amino_acids)) + 
+  geom_bar(stat = "identity")+
+  theme(legend.position="none")
+```
+
+
+```{r}
+
+moth
+
+#colnames(X)[2] <- "superduper"
+
+moth_per<-round(moth[,2:21]/moth$sum_col,digits=2)
+
+
+# df <- rbind(df, df2) 
+moth_per<-cbind(moth[,1],moth_per)
+# colnames(moth_per)[1] - " "
+moth_per
+write.table(moth_per, file='Variant_summary_per.tsv', quote=FALSE, sep='\t', ,row.names=FALSE, col.names = TRUE)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
